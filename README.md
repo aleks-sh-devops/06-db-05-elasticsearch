@@ -237,3 +237,197 @@ latest: digest: sha256:1b6545ea8ca923d15838a856b6cf865added690059c77d27ecc8186a2
 При проектировании кластера elasticsearch нужно корректно рассчитывать количество реплик и шард,
 иначе возможна потеря данных индексов, вплоть до полной, при деградации системы.
 
+## Ответ  
+
+Добавим информацию согласно таблице:  
+```
+curl -X PUT localhost:9200/ind-1 -H 'Content-Type: application/json' -d'{ "settings": { "number_of_shards": 1,  "number_of_replicas": 0 }}'
+curl -X PUT localhost:9200/ind-2 -H 'Content-Type: application/json' -d'{ "settings": { "number_of_shards": 2,  "number_of_replicas": 1 }}'
+curl -X PUT localhost:9200/ind-3 -H 'Content-Type: application/json' -d'{ "settings": { "number_of_shards": 4,  "number_of_replicas": 2 }}'
+```
+Просмотр списка индексов:  
+```
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cat/'
+=^.^=
+/_cat/allocation
+/_cat/shards
+/_cat/shards/{index}
+/_cat/master
+/_cat/nodes
+/_cat/tasks
+/_cat/indices
+/_cat/indices/{index}
+/_cat/segments
+/_cat/segments/{index}
+/_cat/count
+/_cat/count/{index}
+/_cat/recovery
+/_cat/recovery/{index}
+/_cat/health
+/_cat/pending_tasks
+/_cat/aliases
+/_cat/aliases/{alias}
+/_cat/thread_pool
+/_cat/thread_pool/{thread_pools}
+/_cat/plugins
+/_cat/fielddata
+/_cat/fielddata/{fields}
+/_cat/nodeattrs
+/_cat/repositories
+/_cat/snapshots/{repository}
+/_cat/templates
+/_cat/ml/anomaly_detectors
+/_cat/ml/anomaly_detectors/{job_id}
+/_cat/ml/trained_models
+/_cat/ml/trained_models/{model_id}
+/_cat/ml/datafeeds
+/_cat/ml/datafeeds/{datafeed_id}
+/_cat/ml/data_frame/analytics
+/_cat/ml/data_frame/analytics/{id}
+/_cat/transforms
+/_cat/transforms/{transform_id}
+
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cat/indices'
+green  open .geoip_databases            jKQreDFdRoO5qxAFlqMoxw 1 0 40 0 38.2mb 38.2mb
+green  open .monitoring-es-7-2022.12.14 IHFBbhzoQpSS2fvhtI4dBQ 1 0 25 4    1mb    1mb
+green  open ind-1                       LbfuPHZnT4Sx6t_GVrXJrQ 1 0  0 0   226b   226b
+yellow open ind-3                       Wvq4aeudRduuj0PqI7AKng 4 2  0 0   904b   904b
+yellow open ind-2                       QgnrsiMWTTKJ0w3Y0oKjlA 2 1  0 0   452b   452b
+```
+
+Получаем статус индексов:  
+```
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cluster/health/ind-1?pretty'
+{
+  "cluster_name" : "docker-cluster-netology",
+  "status" : "green",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 1,
+  "active_shards" : 1,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 0,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 100.0
+}
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cluster/health/ind-2?pretty'
+{
+  "cluster_name" : "docker-cluster-netology",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 2,
+  "active_shards" : 2,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 2,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 52.38095238095239
+}
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cluster/health/ind-3?pretty'
+{
+  "cluster_name" : "docker-cluster-netology",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 4,
+  "active_shards" : 4,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 8,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 52.38095238095239
+}
+```
+
+Получаем состояние кластера:  
+```
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cluster/health/?pretty'
+{
+  "cluster_name" : "docker-cluster-netology",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 11,
+  "active_shards" : 11,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 10,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 52.38095238095239
+```
+
+Статус yellow связан с тем, что у нас 1 хост на котором поднят 1 контейнер. Реплики некуда делать и соответственно elastic "думает", что у него все не есть гуд.  
+
+Грохаем индексы:  
+```
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X DELETE 'http://localhost:9200/ind-1?pretty'
+{
+  "acknowledged" : true
+}
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X DELETE 'http://localhost:9200/ind-2?pretty'
+{
+  "acknowledged" : true
+}
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X DELETE 'http://localhost:9200/ind-3?pretty'
+{
+  "acknowledged" : true
+}
+```
+
+Проверяем:  
+```
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch# curl -X GET 'http://localhost:9200/_cat/indices'
+green open .geoip_databases            jKQreDFdRoO5qxAFlqMoxw 1 0 40 0 38.2mb 38.2mb
+green open .monitoring-es-7-2022.12.14 IHFBbhzoQpSS2fvhtI4dBQ 1 0 25 4  1.4mb  1.4mb
+root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch#
+```
+
+## Задача 3
+
+В данном задании вы научитесь:
+- создавать бэкапы данных
+- восстанавливать индексы из бэкапов
+
+Создайте директорию `{путь до корневой директории с elasticsearch в образе}/snapshots`.
+
+Используя API [зарегистрируйте](https://www.elastic.co/guide/en/elasticsearch/reference/current/snapshots-register-repository.html#snapshots-register-repository) 
+данную директорию как `snapshot repository` c именем `netology_backup`.
+
+**Приведите в ответе** запрос API и результат вызова API для создания репозитория.
+
+Создайте индекс `test` с 0 реплик и 1 шардом и **приведите в ответе** список индексов.
+
+[Создайте `snapshot`](https://www.elastic.co/guide/en/elasticsearch/reference/current/snapshots-take-snapshot.html) 
+состояния кластера `elasticsearch`.
+
+**Приведите в ответе** список файлов в директории со `snapshot`ами.
+
+Удалите индекс `test` и создайте индекс `test-2`. **Приведите в ответе** список индексов.
+
+[Восстановите](https://www.elastic.co/guide/en/elasticsearch/reference/current/snapshots-restore-snapshot.html) состояние
+кластера `elasticsearch` из `snapshot`, созданного ранее. 
+
+**Приведите в ответе** запрос к API восстановления и итоговый список индексов.
+
+Подсказки:
+- возможно вам понадобится доработать `elasticsearch.yml` в части директивы `path.repo` и перезапустить `elasticsearch`
+
+## Ответ  
