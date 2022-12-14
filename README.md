@@ -431,3 +431,131 @@ root@gitlab-podman2:~/netology/virt-homeworks/06-db-05-elasticsearch#
 - возможно вам понадобится доработать `elasticsearch.yml` в части директивы `path.repo` и перезапустить `elasticsearch`
 
 ## Ответ  
+Запрос API и результат вызова API для создания репозитория:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X PUT "localhost:9200/_snapshot/netology_backup" -H 'Content-Type: application/json' -d'
+> {
+>    "type": "fs",
+>    "settings": {
+>      "location": "/usr/share/elasticsearch/snapshots"
+>    }
+>  }
+> '
+{"acknowledged":true}
+```
+
+Курлим индекс test с 0 репликами и 1 шардом:   
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X PUT "localhost:9200/test?pretty" -H 'Content-Type: application/json' -d'
+> {
+>    "settings": {
+>      "index": {
+>        "number_of_shards": 1,
+>        "number_of_replicas": 0
+>      }
+>    }
+>  }
+> '
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "test"
+}
+```
+
+Смотрим список файлов в папке snapshots: 
+```
+root@7e02906a46de:/usr/share/elasticsearch# ls -lah snapshots/
+total 12K
+drwxr-xr-x 1 elasticsearch elasticsearch 4.0K Dec 14 18:47 .
+drwxrwxr-x 1 root          root          4.0K Dec 14 11:09 ..
+```
+
+Делаем снапшот snapshot  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X PUT "localhost:9200/_snapshot/netology_backup/test_snapshot?pretty"
+{
+  "accepted" : true
+}
+```
+
+Проверяем:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# ls -lah snapshots/
+total 60K
+drwxr-xr-x 1 elasticsearch elasticsearch 4.0K Dec 14 19:01 .
+drwxrwxr-x 1 root          root          4.0K Dec 14 11:09 ..
+-rw-rw-r-- 1 elasticsearch root          1.7K Dec 14 19:01 index-0
+-rw-rw-r-- 1 elasticsearch root             8 Dec 14 19:01 index.latest
+drwxrwxr-x 7 elasticsearch root          4.0K Dec 14 19:01 indices
+-rw-rw-r-- 1 elasticsearch root           29K Dec 14 19:01 meta-FWkjqurDTF-M9f_TGetu8w.dat
+-rw-rw-r-- 1 elasticsearch root           780 Dec 14 19:01 snap-FWkjqurDTF-M9f_TGetu8w.dat
+```
+
+Грохаем индекс test:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X DELETE "localhost:9200/test"
+{"acknowledged":true}
+```
+Создаем индекс test-2:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X PUT "localhost:9200/test-2?pretty" -H 'Content-Type: application/json' -d'
+>  {
+>    "settings": {
+>      "index": {
+>        "number_of_shards": 1,
+>        "number_of_replicas": 0
+>      }
+>    }
+>  }
+> '
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "test-2"
+}
+```
+
+Выводим список индексов:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X GET "localhost:9200/_cat/indices/*"
+green open .geoip_databases            jKQreDFdRoO5qxAFlqMoxw 1 0    40     0 38.2mb 38.2mb
+green open test-2                      m4EEHB_RQm-RIc2JmFTwrw 1 0     0     0   226b   226b
+green open .monitoring-es-7-2022.12.14 IHFBbhzoQpSS2fvhtI4dBQ 1 0 20492 14192 13.3mb 13.3mb
+```
+
+Откатываемся назад:  
+```
+root@7e02906a46de:/usr/share/elasticsearch# curl -X GET "localhost:9200/_snapshot/netology_backup/*?verbose=false&pretty"
+{
+  "snapshots" : [
+    {
+      "snapshot" : "test_snapshot",
+      "uuid" : "FWkjqurDTF-M9f_TGetu8w",
+      "repository" : "netology_backup",
+      "indices" : [
+        ".ds-.logs-deprecation.elasticsearch-default-2022.12.14-000001",
+        ".ds-ilm-history-5-2022.12.14-000001",
+        ".geoip_databases",
+        ".monitoring-es-7-2022.12.14",
+        "test"
+      ],
+      "data_streams" : [ ],
+      "state" : "SUCCESS"
+    }
+  ],
+  "total" : 1,
+  "remaining" : 0
+}
+
+curl -X POST "localhost:9200/_snapshot/netology_backup/test_snapshot_restore?pretty" 
+{
+  "accepted" : true
+}
+
+root@7e02906a46de:/usr/share/elasticsearch# curl -X GET "localhost:9200/_cat/indices/*"
+green open  .geoip_databases            jKQreDFdRoO5qxAFlqMoxw 1 0 40 0 38.2mb 38.2mb
+green open  test-2                      m4EEHB_RQm-RIc2JmFTwrw 1 0  0 0   226b   226b
+green open  test                        TfmDu4iOQniQAjds7sTQ1A 1 0  0 0   226b   226b
+green close .monitoring-es-7-2022.12.14 IHFBbhzoQpSS2fvhtI4dBQ 1 0
+```
